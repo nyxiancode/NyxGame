@@ -9,7 +9,7 @@ name, topplace, money = '', '', 50000
 desire, animals, count, buyan, sell_it = '', ['Sapi', 'Babi', 'Kelinci', 'Ayam', 'Kuda', 'Domba', 'Angsa'], 0, \
     '', ''
 time = [50, 35, 5, 10, 65, 45, 10]
-bot = telebot.TeleBot('TOKEN')
+bot = telebot.TeleBot('7477914057:AAF36unurvS0FNK7QlpxqXds5wRtdCeckaI')
 sell_dict = {'Sapi': {1: randint(50000, 60000)},
              'Babi': {1: randint(22000, 27000)},
              'Kuda': {1: randint(120000, 150000)},
@@ -104,10 +104,10 @@ def start_message(message):
         if us_name in i:
             st = 1
             break
-    name = cur.execute(f"SELECT name FROM goods WHERE us_name = ?;""", (us_name,)).fetchone()
+    name = cur.execute(f"SELECT name FROM goods WHERE us_name = ?;", (us_name,)).fetchone()
     if name:
         name = name[0].strip()
-    if st == 0 atau name == '':
+    if st == 0 or name == '':
         bot.send_message(message.chat.id, f"Halo, {us_name}! "
                                           f"Kamu memiliki pertanian dan modal awal, kamu harus mengembangkan "
                                           "peternakanmu, karena itu adalah bisnis utama kamu. Kamu bisa membeli "
@@ -125,7 +125,7 @@ def start_message(message):
         bot.send_message(message.chat.id, f"«{phrases[randint(0, len(phrases) - 1)]}»",
                          reply_markup=get_help_keyboard())
     else:
-        unpack = cur.execute(f"SELECT * FROM goods WHERE us_name = ?;""", (us_name,)).fetchall()[0]
+        unpack = cur.execute(f"SELECT * FROM goods WHERE us_name = ?;", (us_name,)).fetchall()[0]
         money, anm, ad_anm = unpack[2], unpack[3], unpack[4]
 
         bot.send_message(message.chat.id,
@@ -149,97 +149,131 @@ def start_message(message):
 def get_help_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     keys = ['/help', '/reg', '/top', '/cost', '/buy', '/myinfo', '/sell']
-    keyboard.row(*(types.InlineKeyboardButton(key, callback_data=key) for key in keys))
+
+    for key in keys:
+        keyboard.add(types.InlineKeyboardButton(text=key, callback_data=key))
+
     return keyboard
 
 
 @bot.message_handler(commands=['reg'])
 def registration(message):
-    us_name = message.from_user.first_name
+    global name
+    name = message.text.split()
     con = sqlite3.connect('petani.db')
     cur = con.cursor()
-    result = cur.execute('''SELECT us_name FROM goods''').fetchall()
-    if not result or us_name not in [i[0] for i in result]:
-        name = us_name
-        cur.execute(f"""INSERT INTO goods (us_name, name, money, animals, ad_animals)
-                    VALUES (?, ?, ?, ?, ?);""", (us_name, name, money, anm, ad_anm))
-        con.commit()
-        bot.send_message(message.chat.id, f"{us_name}, kamu berhasil mendaftar")
-    else:
-        bot.send_message(message.chat.id, f"{us_name}, kamu sudah terdaftar")
+    us_name = message.from_user.first_name
+
+    cur.execute(f"DELETE FROM goods WHERE us_name = ?;", (us_name,))
+    con.commit()
     con.close()
 
+    bot.send_message(message.chat.id, f"Oke, {name}, kamu sekarang terdaftar di permainan. "
+                                      "Selamat bermain dan semoga sukses!")
 
 @bot.message_handler(commands=['top'])
 def top(message):
     con = sqlite3.connect('petani.db')
     cur = con.cursor()
-    result = cur.execute(f'''SELECT * FROM goods ORDER BY money DESC LIMIT 3;''').fetchall()
-    top_message = "3 petani terbaik adalah:\n"
-    for place, farmer in enumerate(result, start=1):
-        top_message += f"{place}. {farmer[1]}: {farmer[2]} rupiah\n"
+    result = cur.execute("SELECT * FROM goods ORDER BY money DESC LIMIT 3;").fetchall()
+
+    if result:
+        top_message = "Top 3 petani:\n"
+        for idx, row in enumerate(result, 1):
+            top_message += f"{idx}. {row[0]} - {row[2]} rupiah\n"
+    else:
+        top_message = "Belum ada petani terdaftar."
+
     bot.send_message(message.chat.id, top_message)
     con.close()
 
 
 @bot.message_handler(commands=['cost'])
 def cost(message):
-    cost_message = "Harga untuk pembelian hewan adalah:\n"
-    for animal, price in dict.items():
-        cost_message += f"{animal}: {price} rupiah\n"
-    bot.send_message(message.chat.id, cost_message)
+    a, s = 0, ''
+    for i in dict:
+        s += animals[a] + ': ' + str(dict[i]) + ' rupiah\n'
+        a += 1
+    bot.send_message(message.chat.id, f'Harga untuk pembelian:\n\n{s}')
 
 
 @bot.message_handler(commands=['buy'])
 def buy(message):
-    bot.send_message(message.chat.id, "Hewan apa yang ingin kamu beli?",
-                     reply_markup=types.ReplyKeyboardMarkup(one_time_keyboard=True).add(*animals))
+    keyboard = types.InlineKeyboardMarkup()
+    keys = []
+
+    for key in animals_names:
+        keys.append(types.InlineKeyboardButton(text=key, callback_data=f'buy_{key.split()[0]}'))
+
+    for key in keys:
+        keyboard.add(key)
+
+    bot.send_message(message.chat.id, "Pilih hewan yang ingin kamu beli:", reply_markup=keyboard)
 
 
-@bot.message_handler(func=lambda message: message.text in animals)
-def handle_animal_choice(message):
-    global buyan, money
-    buyan = message.text
-    price = dict[buyan]
-    if money >= price:
-        count_dict[buyan] += 1
-        money -= price
-        bot.send_message(message.chat.id,
-                         f"Kamu berhasil membeli {buyan}. Kamu sekarang memiliki {count_dict[buyan]} {buyan}.")
+@bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'buy')
+def buy_animal(call):
+    global name, animals, count, buyan, money
+    anm = call.data.split('_')[1]
+
+    keyboard = types.InlineKeyboardMarkup()
+    keys = [types.InlineKeyboardButton(text='1', callback_data=f'buy_{anm}_1')]
+
+    if money >= dict[anm]:
+        money -= dict[anm]
+        count += 1
+        count_dict[anm] += 1
+        ad_anm = anm + ': ' + str(count_dict[anm])
+        for key in keys:
+            keyboard.add(key)
+        bot.send_message(call.message.chat.id, f'Kamu membeli {anm} satu unit', reply_markup=keyboard)
+        bot.send_message(call.message.chat.id, f"Sekarang kamu memiliki {money} rupiah")
     else:
-        bot.send_message(message.chat.id,
-                         f"Kamu tidak memiliki cukup uang untuk membeli {buyan}. Uang kamu saat ini: {money}.")
+        bot.send_message(call.message.chat.id, f'Kamu tidak memiliki cukup uang untuk membeli {anm}')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.split('_')[0] == 'buy' and call.data.split('_')[2].isdigit())
+def buy_product(call):
+    global ad_anm, count_dict, products, money
+    anm = call.data.split('_')[1]
+    count = int(call.data.split('_')[2])
+
+    keyboard = types.InlineKeyboardMarkup()
+    keys = []
+
+    for key in sell_dict[anm]:
+        keys.append(types.InlineKeyboardButton(text=str(key), callback_data=f'buy_{anm}_{count}_{key}'))
+
+    if money >= sell_dict[anm][count]:
+        money -= sell_dict[anm][count]
+        products[anm] += count
+        ad_anm = anm + ': ' + str(count_dict[anm])
+        for key in keys:
+            keyboard.add(key)
+        bot.send_message(call.message.chat.id, f'Kamu membeli {count} {anm}', reply_markup=keyboard)
+        bot.send_message(call.message.chat.id, f"Sekarang kamu memiliki {money} rupiah")
+    else:
+        bot.send_message(call.message.chat.id, f'Kamu tidak memiliki cukup uang untuk membeli {count} {anm}')
 
 
 @bot.message_handler(commands=['myinfo'])
 def myinfo(message):
-    info_message = f"Informasi utama kamu:\nNama: {us_name}\nUang: {money} rupiah\nHewan: "
-    for animal, count in count_dict.items():
-        info_message += f"{animal}: {count}\n"
-    info_message += "\nProduk:\n"
-    for product, count in products.items():
-        info_message += f"{product}: {count}\n"
-    bot.send_message(message.chat.id, info_message)
+    bot.send_message(message.chat.id, f'{name}, kamu memiliki {money} rupiah, hewan: {anm}, lebih banyak lagi: {ad_anm}')
 
 
 @bot.message_handler(commands=['sell'])
 def sell(message):
-    sell_message = "Produk apa yang ingin kamu jual?\n"
-    for product, count in products.items():
-        sell_message += f"{product}: {count}\n"
-    bot.send_message(message.chat.id, sell_message,
-                     reply_markup=types.ReplyKeyboardMarkup(one_time_keyboard=True).add(*products.keys()))
+    keyboard = types.InlineKeyboardMarkup()
+    keys = []
+
+    for key in products:
+        if products[key] > 0:
+            keys.append(types.InlineKeyboardButton(text=key, callback_data=f'sell_{key}'))
+
+    for key in keys:
+        keyboard.add(key)
+
+    bot.send_message(message.chat.id, "Pilih produk untuk dijual:", reply_markup=keyboard)
 
 
-@bot.message_handler(func=lambda message: message.text in products)
-def handle_sell_choice(message):
-    global money
-    product = message.text
-    quantity = products[product]
-    price = sell_dict[product][1]
-    money += quantity * price
-    products[product] = 0
-    bot.send_message(message.chat.id, f"Kamu berhasil menjual {quantity} {product} seharga {quantity * price} rupiah. Uang kamu sekarang: {money}.")
-
-
-bot.polling()
+bot.polling(none_stop=True)
