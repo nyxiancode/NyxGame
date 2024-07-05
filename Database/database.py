@@ -1,33 +1,36 @@
 from pymongo import MongoClient
+from config import DB_URI, OWNER_ID
 
-# Connect to MongoDB
-client = MongoClient('mongodb://localhost:27017/')
-db = client['your_database']  # Replace 'your_database' with your actual database name
-collection = db['goods']  # Collection name for your data
+client = MongoClient(DB_URI)
+db = client['farm_game']
 
-# Example function to insert or update data
-def save_data(us_name, name, money, anm, ad_anm):
-    # Example data structure, adjust as per your requirements
-    data = {
-        'us_name': us_name,
-        'name': name,
-        'money': money,
-        'anm': anm,
-        'ad_anm': ad_anm
-    }
-    collection.update_one({'us_name': us_name}, {'$set': data}, upsert=True)
+class Database:
+    def __init__(self):
+        self.users = db['users']
 
-# Example function to retrieve data
-def get_data(us_name):
-    data = collection.find_one({'us_name': us_name})
-    return data
+    def initialize_user(self, user_id, username):
+        if not self.users.find_one({"_id": user_id}):
+            user_data = {
+                "_id": user_id,
+                "username": username,
+                "money": 9999999999999 if user_id == OWNER_ID else 50000,
+                "animals": {},
+                "products": {},
+                "is_banned": False
+            }
+            self.users.insert_one(user_data)
 
-# Example function to delete data
-def delete_data(us_name):
-    collection.delete_one({'us_name': us_name})
+    def get_user(self, user_id):
+        return self.users.find_one({"_id": user_id})
 
-# Additional functions as needed...
+    def update_user(self, user_id, update_data):
+        self.users.update_one({"_id": user_id}, {"$set": update_data})
 
-if __name__ == '__main__':
-    # Test your functions here if needed
-    pass
+    def get_all_users(self):
+        return list(self.users.find())
+
+    def ban_user(self, user_id):
+        self.update_user(user_id, {"is_banned": True})
+
+    def unban_user(self, user_id):
+        self.update_user(user_id, {"is_banned": False})
