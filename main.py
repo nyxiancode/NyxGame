@@ -2,7 +2,7 @@ from telebot import TeleBot, types
 from pymongo import MongoClient
 
 # Connect to MongoDB
-client = MongoClient('mongodb://localhost:27017/')
+client = MongoClient('mongodb+srv://reacode:<password>@reamusic.x7hyx2h.mongodb.net/?retryWrites=true&w=majority&appName=reamusic')
 db = client['petani']  # Replace 'petani' with your database name
 collection = db['goods']  # Collection name for storing 'goods' data
 
