@@ -58,3 +58,22 @@ def register_handlers(bot: TeleBot):
             bot.send_message(message.chat.id, f"You sold {product}!")
         else:
             bot.send_message(message.chat.id, "Not enough products!")
+
+    @bot.message_handler(commands=['cost'])
+    def show_cost(message):
+        prices = {
+            'Cow': 13000,
+            'Pig': 7000,
+            'Rabbit': 450,
+            'Chicken': 250,
+            'Horse': 45000,
+            'Sheep': 8000,
+            'Goose': 650,
+            'Cow Milk': '80-110',
+            'Chicken Eggs': '80-110',
+            'Sheep Wool': '900-1020'
+        }
+        cost_info = "Price List:\n"
+        for item, price in prices.items():
+            cost_info += f"{item}: {price}\n"
+        bot.send_message(message.chat.id, cost_info)
