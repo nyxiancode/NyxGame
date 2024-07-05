@@ -5,10 +5,13 @@ from random import randint
 def register_handlers(bot: TeleBot):
     db = Database()
 
+
     @bot.message_handler(commands=['reg'])
     def register_user(message):
         db.initialize_user(message.from_user.id, message.from_user.username)
+        db.add_nyx_coin(message.from_user.id, 50)
         bot.send_message(message.chat.id, "You are registered!")
+
 
     @bot.message_handler(commands=['myinfo'])
     def my_info(message):
