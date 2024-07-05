@@ -2,12 +2,7 @@ from telebot import types
 import telebot
 import datetime as dt
 from random import randint
-from pymongo import MongoClient
-
-# Koneksi ke MongoDB
-client = MongoClient('mongodb+srv://reacode:<password>@reamusic.x7hyx2h.mongodb.net/?retryWrites=true&w=majority&appName=reamusic')
-db = client['farmers']
-collection = db['barang']
+import sqlite3
 
 time = dt.datetime.now().strftime("%A %d-%B-%y %H:%M:%S")
 nama, peringkat_teratas, uang = '', '', 50000
@@ -100,9 +95,18 @@ def callback_query(call):
 def start_message(message):
     global nama_pengguna, nama, uang, hewan_beli, hewan_tambah
     nama_pengguna = message.from_user.first_name
-    user_data = collection.find_one({"nama_pengguna": nama_pengguna})
-
-    if not user_data:
+    con = sqlite3.connect('farmers.db')
+    cur = con.cursor()
+    result = cur.execute('''SELECT nama_pengguna FROM barang''').fetchall()
+    st = 0
+    for i in result:
+        if nama_pengguna in i:
+            st = 1
+            break
+    nama = cur.execute(f"SELECT nama FROM barang WHERE nama_pengguna = ?;""", (nama_pengguna,)).fetchone()
+    if nama:
+        nama = nama[0].strip()
+    if st == 0 atau nama == '':
         bot.send_message(message.chat.id, f"Halo, {nama_pengguna}! "
                                           f"Kamu memiliki peternakan dan modal awal, kamu perlu mengembangkan "
                                           "peternakanmu dengan berbagai cara, karena ini adalah bisnis utamamu. Kamu bisa membeli "
@@ -119,10 +123,8 @@ def start_message(message):
         bot.send_message(message.chat.id, f"«{kutipan[randint(0, len(kutipan) - 1)]}»",
                          reply_markup=get_help_keyboard())
     else:
-        nama = user_data['nama']
-        uang = user_data['uang']
-        hewan_beli = user_data['hewan_beli']
-        hewan_tambah = user_data['hewan_tambah']
+        unpack = cur.execute(f"SELECT * FROM barang WHERE nama_pengguna = ?;""", (nama_pengguna,)).fetchall()[0]
+        uang, hewan_beli, hewan_tambah = unpack[2], unpack[3], unpack[4]
 
         bot.send_message(message.chat.id,
                          f"Halo, {nama}! Kamu memiliki peternakan dan modal awal,"
@@ -140,37 +142,54 @@ def start_message(message):
                          " /sell - menjual produk yang dimiliki.")
         bot.send_message(message.chat.id, f"«{kutipan[randint(0, len(kutipan) - 1)]}»",
                          reply_markup=get_help_keyboard())
+    con.commit()
+    cur.close()
+    con.close()
 
 
 @bot.message_handler(commands=['reg'])
 def registration(message):
     global nama_pengguna, nama, uang, beli_hewan, jumlah_hewan
-
-    user_data = collection.find_one({"nama_pengguna": nama_pengguna})
-    if not user_data:
-        collection.insert_one({
-            "nama_pengguna": nama_pengguna,
-            "nama": nama,
-            "uang": uang,
-            "beli_hewan": beli_hewan,
-            "jumlah_hewan": jumlah_hewan,
-            "timestamp": dt.datetime.now()
-        })
+    con = sqlite3.connect('farmers.db')
+    cur = con.cursor()
+    result = cur.execute('''SELECT nama_pengguna FROM barang''').fetchall()
+    st = 0
+    for i in result:
+        if nama_pengguna in i:
+            st = 1
+            break
+    if st == 0:
+        cur.execute('INSERT INTO barang VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);', (nama_pengguna, nama, uang, beli_hewan,
+                                                                                 jumlah_hewan['Sapi'], jumlah_hewan['Babi'],
+                                                                                 jumlah_hewan['Kelinci'],
+                                                                                 jumlah_hewan['Ayam'],
+                                                                                 jumlah_hewan['Kuda'],
+                                                                                 jumlah_hewan['Domba'],
+                                                                                 jumlah_hewan['Angsa'],
+                                                                                 dt.datetime.now()))
+        con.commit()
         bot.send_message(message.chat.id, 'Registrasi berhasil! Sekarang kamu dapat mulai mengelola peternakanmu.',
                          reply_markup=get_help_keyboard())
     else:
         bot.send_message(message.chat.id, 'Kamu sudah terdaftar!',
                          reply_markup=get_help_keyboard())
+    cur.close()
+    con.close()
 
 
 @bot.message_handler(commands=['top'])
 def top(message):
-    top_users = collection.find().sort("uang", -1).limit(10)
+    con = sqlite3.connect('farmers.db')
+    cur = con.cursor()
+    result = cur.execute('''SELECT nama_pengguna, uang FROM barang ORDER BY uang DESC LIMIT 10''').fetchall()
     s = ''
-    for user in top_users:
-        s += f'{user["nama_pengguna"]} - {user["uang"]} IDR\n'
+    for i in result:
+        s += f'{i[0]} - {i[1]} IDR\n'
     bot.send_message(message.chat.id, f'Berikut daftar peternak terbaik:\n\n{s}',
                      reply_markup=get_help_keyboard())
+    con.commit()
+    cur.close()
+    con.close()
 
 
 @bot.message_handler(commands=['cost'])
@@ -194,23 +213,24 @@ def buy(message):
 @bot.message_handler(commands=['myinfo'])
 def myinfo(message):
     global nama, uang, hewan_beli, hewan_tambah
-    user_data = collection.find_one({"nama_pengguna": message.from_user.first_name})
-
-    if user_data:
-        nama = user_data['nama']
-        uang = user_data['uang']
-        hewan_beli = user_data['hewan_beli']
-        hewan_tambah = user_data['hewan_tambah']
-        hewan_milik = user_data['jumlah_hewan']
-
+    con = sqlite3.connect('farmers.db')
+    cur = con.cursor()
+    result = cur.execute(f"SELECT * FROM barang WHERE nama_pengguna = ?;""", (message.from_user.first_name,)).fetchall()
+    if result:
+        unpack = result[0]
+        nama, uang, hewan_beli, hewan_tambah = unpack[1], unpack[2], unpack[3], unpack[4]
+        hewan_milik = unpack[5:]
         s = f'Nama: {nama}\nUang: {uang} IDR\n\nHewan yang dimiliki:\n'
-        for i in hewan_milik:
-            s += f'{i}: {hewan_milik[i]}\n'
+        for i, j in enumerate(hewan_milik):
+            s += f'{hewan[i]}: {j}\n'
         bot.send_message(message.chat.id, f'Informasi utama kamu:\n\n{s}',
                          reply_markup=get_help_keyboard())
     else:
         bot.send_message(message.chat.id, 'Kamu belum terdaftar. Gunakan perintah /reg untuk mendaftar.',
                          reply_markup=get_help_keyboard())
+    con.commit()
+    cur.close()
+    con.close()
 
 
 @bot.message_handler(commands=['sell'])
