@@ -8,6 +8,14 @@ class Database:
     def __init__(self):
         self.users = db['users']
 
+    async def add_nyx_coin(self, user_id: int, amount: int):
+        user = mycol.find_one({'_id': user_id})
+        if user:
+            current_nyx_coin = int(user.get('nyx_coin', 0))
+            new_nyx_coin = current_nyx_coin + amount
+            mycol.update_one({'_id': user_id}, {'$set': {'nyx_coin': new_nyx_coin}})
+            
+
     def initialize_user(self, user_id, username):
         if not self.users.find_one({"_id": user_id}):
             user_data = {
