@@ -5,7 +5,7 @@ from random import randint
 from pymongo import MongoClient
 
 # Koneksi ke MongoDB
-client = MongoClient('mongodb://username:password@host:port/database')
+client = MongoClient('mongodb+srv://reacode:<password>@reamusic.x7hyx2h.mongodb.net/?retryWrites=true&w=majority&appName=reamusic')
 db = client['farmers']
 collection = db['barang']
 
@@ -13,7 +13,7 @@ time = dt.datetime.now().strftime("%A %d-%B-%y %H:%M:%S")
 nama, peringkat_teratas, uang = '', '', 50000
 keinginan, hewan, jumlah, beli_hewan, jual_hewan = '', ['Sapi', 'Babi', 'Kelinci', 'Ayam', 'Kuda', 'Domba', 'Angsa'], 0, '', ''
 waktu = [50, 35, 5, 10, 65, 45, 10]
-bot = telebot.TeleBot('6016919639:AAE6_gNV_1sjGN_wUBHAYyciJrAyl1uIeEA')
+bot = telebot.TeleBot('7477914057:AAF36unurvS0FNK7QlpxqXds5wRtdCeckaI')
 harga_jual = {'Sapi': {1: randint(50000, 60000)},
               'Babi': {1: randint(22000, 27000)},
               'Kuda': {1: randint(120000, 150000)},
